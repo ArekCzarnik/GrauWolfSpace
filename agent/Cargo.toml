@@ -13,7 +13,6 @@ grauwolf-graph = { path = "/opt/grauwolf/crates/domain/grauwolf-graph" }
 grauwolf-llm = { path = "/opt/grauwolf/crates/domain/grauwolf-llm" }
 grauwolf-prompt = { path = "/opt/grauwolf/crates/domain/grauwolf-prompt" }
 serde_json = "1"
-grauwolf-tools = { path = "/opt/grauwolf/crates/domain/grauwolf-tools" }
 grauwolf = { path = "/opt/grauwolf/crates/apps/grauwolf", optional = true }
 
 [features]

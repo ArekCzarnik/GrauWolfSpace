@@ -5,7 +5,6 @@ use grauwolf_agents::AgentContext;
 use grauwolf_graph::{GraphError, TypedGraph};
 use grauwolf_llm::PromptExecutor;
 use grauwolf_prompt::{LlModel, Prompt};
-use grauwolf_tools::{DynTool, ToolRegistry};
 use grauwolf_agents::run_handles::RunHandles;
 use grauwolf_agents::events::Feature;
 /// Strategy graph of the agent.
@@ -86,56 +85,38 @@ pub fn prompt() -> Prompt {
         .system("You are a helpful assistant. Answer briefly. Answer in German")
         .build()
 }
-/// Tools that must be provided from outside (MCP, knowledge, sub-agents, built-in tools).
-pub const EXTERNAL_TOOLS: &[&str] = &["load_skill", "read_skill_file"];
 /// Runs the agent with `input` in a fresh context.
 pub async fn run(
     executor: Arc<PromptExecutor>,
     input: String,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    run_with_tools(executor, input, Vec::new()).await
-}
-/// Like [`run`]; `external` must contain all [`EXTERNAL_TOOLS`].
-pub async fn run_with_tools(
-    executor: Arc<PromptExecutor>,
-    input: String,
-    external: Vec<Arc<dyn DynTool>>,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    run_observed(executor, input, external, Vec::new()).await
+    run_observed(executor, input, Vec::new()).await
 }
 /// Like [`run`]; `features` see all events of the run, in the same order as with the interpreter (ADR-0084).
 pub async fn run_observed(
     executor: Arc<PromptExecutor>,
     input: String,
-    external: Vec<Arc<dyn DynTool>>,
     features: Vec<Arc<dyn Feature>>,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    run_handled(executor, Some(input), external, features, RunHandles::default()).await
+    run_handled(executor, Some(input), features, RunHandles::default()).await
 }
 /// The core of all entry points: like [`run_observed`], with the handles of the caller – prices, a budget of its own, an approver for tools that need approval, a frame sink, a conversation, attachments and checkpoints; with `handles.resume` the run continues from its checkpoint and `input` is `None` (ADR-0119).
 pub async fn run_handled(
     executor: Arc<PromptExecutor>,
     input: Option<String>,
-    external: Vec<Arc<dyn DynTool>>,
     features: Vec<Arc<dyn Feature>>,
     handles: RunHandles,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let state = handles.resume_state().await?;
-    let registry = tools(external)?;
-    let prompt = match registry.prompt_addition() {
-        Some(addition) => prompt().extend_system(&addition),
-        None => prompt(),
-    };
     let mut ctx = handles
         .context(
             executor,
             model(),
-            prompt,
+            prompt(),
             state.as_ref(),
             grauwolf_agents::Budget::default(),
             &[],
-        )?
-        .with_tools(registry);
+        )?;
     for feature in features {
         ctx = ctx.install(feature);
     }
@@ -144,7 +125,7 @@ pub async fn run_handled(
     Ok(RunHandles::run_graph(run, &mut ctx, graph, input, state).await?)
 }
 /// The spec of this crate as JSON (for `run_app`, ADR-0084).
-pub const SPEC_JSON: &str = "{\"spec_version\":1,\"name\":\"agent\",\"model\":{\"provider\":\"ollama\",\"id\":\"qwen3.5:9b\"},\"system_prompt\":\"You are a helpful assistant. Answer briefly. Answer in German\",\"types\":{},\"input\":\"string\",\"output\":\"string\",\"tools\":[],\"skills\":[{\"dir\":\"skills\",\"git\":null,\"path\":null,\"rev\":null,\"tag\":null,\"branch\":null,\"names\":null}],\"mcp_servers\":{},\"agent_tools\":{},\"builtin_tools\":null,\"knowledge\":null,\"long_term_memory\":null,\"tools_dir\":null,\"limits\":null,\"self_tools\":null,\"subgraphs\":{},\"strategy\":null,\"graph\":{\"nodes\":[{\"id\":\"call_llm\",\"kind\":\"llm_request\",\"params\":null},{\"id\":\"execute_tool\",\"kind\":\"execute_tool\",\"params\":null},{\"id\":\"send_result\",\"kind\":\"llm_send_tool_result\",\"params\":null},{\"id\":\"execute_tools_in_order\",\"kind\":\"execute_multiple_tools\",\"params\":{\"sequential\":true}},{\"id\":\"send_results\",\"kind\":\"llm_send_multiple_tool_results\",\"params\":null}],\"edges\":[{\"from\":\"start\",\"to\":\"call_llm\",\"when\":null},{\"from\":\"call_llm\",\"to\":\"execute_tool\",\"when\":{\"kind\":\"on_tool_call\",\"params\":null}},{\"from\":\"call_llm\",\"to\":\"execute_tools_in_order\",\"when\":{\"kind\":\"on_multiple_tool_calls\",\"params\":null}},{\"from\":\"call_llm\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}},{\"from\":\"execute_tool\",\"to\":\"send_result\",\"when\":null},{\"from\":\"send_result\",\"to\":\"execute_tool\",\"when\":{\"kind\":\"on_tool_call\",\"params\":null}},{\"from\":\"send_result\",\"to\":\"execute_tools_in_order\",\"when\":{\"kind\":\"on_multiple_tool_calls\",\"params\":null}},{\"from\":\"send_result\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}},{\"from\":\"execute_tools_in_order\",\"to\":\"send_results\",\"when\":null},{\"from\":\"send_results\",\"to\":\"execute_tool\",\"when\":{\"kind\":\"on_tool_call\",\"params\":null}},{\"from\":\"send_results\",\"to\":\"execute_tools_in_order\",\"when\":{\"kind\":\"on_multiple_tool_calls\",\"params\":null}},{\"from\":\"send_results\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}}]}}";
+pub const SPEC_JSON: &str = "{\"spec_version\":1,\"name\":\"agent\",\"model\":{\"provider\":\"ollama\",\"id\":\"qwen3.5:9b\"},\"system_prompt\":\"You are a helpful assistant. Answer briefly. Answer in German\",\"types\":{},\"input\":\"string\",\"output\":\"string\",\"tools\":[],\"mcp_servers\":{},\"agent_tools\":{},\"builtin_tools\":null,\"knowledge\":null,\"long_term_memory\":null,\"tools_dir\":null,\"limits\":null,\"self_tools\":null,\"subgraphs\":{},\"strategy\":null,\"graph\":{\"nodes\":[{\"id\":\"call_llm\",\"kind\":\"llm_request\",\"params\":null},{\"id\":\"execute_tool\",\"kind\":\"execute_tool\",\"params\":null},{\"id\":\"send_result\",\"kind\":\"llm_send_tool_result\",\"params\":null},{\"id\":\"execute_tools_in_order\",\"kind\":\"execute_multiple_tools\",\"params\":{\"sequential\":true}},{\"id\":\"send_results\",\"kind\":\"llm_send_multiple_tool_results\",\"params\":null}],\"edges\":[{\"from\":\"start\",\"to\":\"call_llm\",\"when\":null},{\"from\":\"call_llm\",\"to\":\"execute_tool\",\"when\":{\"kind\":\"on_tool_call\",\"params\":null}},{\"from\":\"call_llm\",\"to\":\"execute_tools_in_order\",\"when\":{\"kind\":\"on_multiple_tool_calls\",\"params\":null}},{\"from\":\"call_llm\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}},{\"from\":\"execute_tool\",\"to\":\"send_result\",\"when\":null},{\"from\":\"send_result\",\"to\":\"execute_tool\",\"when\":{\"kind\":\"on_tool_call\",\"params\":null}},{\"from\":\"send_result\",\"to\":\"execute_tools_in_order\",\"when\":{\"kind\":\"on_multiple_tool_calls\",\"params\":null}},{\"from\":\"send_result\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}},{\"from\":\"execute_tools_in_order\",\"to\":\"send_results\",\"when\":null},{\"from\":\"send_results\",\"to\":\"execute_tool\",\"when\":{\"kind\":\"on_tool_call\",\"params\":null}},{\"from\":\"send_results\",\"to\":\"execute_tools_in_order\",\"when\":{\"kind\":\"on_multiple_tool_calls\",\"params\":null}},{\"from\":\"send_results\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}}]}}";
 /// Provisions the agent once: providers, external tools, sub-agents and long-term memory with paths relative to `base_dir`, configuration from `options` (feature `app`, ADR-0114).
 #[cfg(feature = "app")]
 pub async fn provision(
@@ -164,11 +145,9 @@ async fn run_with_options(
     input: Option<String>,
     options: grauwolf::app::RunOptions,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let external = provisioned.tools_for(options.user.as_deref())?;
     run_handled(
             provisioned.executor(),
             input,
-            external,
             options.features.clone(),
             options.handles(provisioned.prices()),
         )
@@ -219,26 +198,4 @@ pub async fn run_app_with(
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let provisioned = provision(base_dir, provision_options).await?;
     run_provisioned(&provisioned, input, options).await
-}
-/// Tools of the spec (code in the sandbox) and the external tools from `external`.
-pub fn tools(
-    external: Vec<Arc<dyn DynTool>>,
-) -> Result<ToolRegistry, Box<dyn std::error::Error + Send + Sync>> {
-    if let Some(missing) = EXTERNAL_TOOLS
-        .iter()
-        .find(|name| !external.iter().any(|tool| tool.name() == **name))
-    {
-        return Err(
-            format!(
-                "tool '{missing}' was not provided (MCP server, knowledge, sub-agent or built-in tool)"
-            )
-                .into(),
-        );
-    }
-    let registry = ToolRegistry::builder();
-    let registry = external
-        .into_iter()
-        .filter(|tool| EXTERNAL_TOOLS.contains(&tool.name()))
-        .fold(registry, |registry, tool| registry.shared(tool));
-    Ok(registry.build())
 }
