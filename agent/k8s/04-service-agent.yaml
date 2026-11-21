@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: grauwolf-k8-ops
+    app.kubernetes.io/name: grauwolf
+    grauwolf.io/agent: agent
+  name: agent
+  namespace: agent
+spec:
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+  - name: mtls
+    port: 8443
+    targetPort: mtls
+  selector:
+    app.kubernetes.io/name: grauwolf
+    grauwolf.io/agent: agent
+  type: ClusterIP
