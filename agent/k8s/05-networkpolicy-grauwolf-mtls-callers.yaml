@@ -1,0 +1,19 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: grauwolf-k8-ops
+    grauwolf.io/agent: acme-agent
+  name: grauwolf-mtls-callers
+  namespace: acme-agent
+spec:
+  ingress:
+  - ports:
+    - port: 8080
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      grauwolf.io/agent: acme-agent
+  policyTypes:
+  - Ingress
