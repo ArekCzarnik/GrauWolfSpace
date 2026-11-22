@@ -19,7 +19,7 @@ spec:
   template:
     metadata:
       annotations:
-        grauwolf.io/config-hash: e6e235fbc9e0b0c3
+        grauwolf.io/config-hash: "3f1d4590cc7c6269"
       labels:
         app.kubernetes.io/name: grauwolf
         grauwolf.io/agent: acme-agent
@@ -45,7 +45,7 @@ spec:
           value: "8080"
         - name: Test
           value: asdasd
-        image: "registry.agentswork.de/agent@sha256:3b08f25841d3ac5d54ad973d739431af82c7e6bcee32e4e47cf1801b4072f0a7"
+        image: "registry.agentswork.de/agent@sha256:a19d1884d6df648766c56f942472eb315f1fe5d67a226d800bd878f3c563c9b0"
         livenessProbe:
           failureThreshold: 6
           httpGet:
