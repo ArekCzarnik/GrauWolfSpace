@@ -8,15 +8,5 @@
     "port": 11434,
     "purpose": "model (ollama)",
     "scheme": "http"
-  },
-  {
-    "any_port": false,
-    "from_env": null,
-    "host": "github.com",
-    "phase": "run",
-    "pointer": "/builtin_tools/git/repo_url",
-    "port": 443,
-    "purpose": "git tools",
-    "scheme": "https"
   }
 ]
