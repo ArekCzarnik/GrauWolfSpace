@@ -12,11 +12,11 @@
   {
     "any_port": false,
     "from_env": null,
-    "host": "agent.example.com",
+    "host": "acme-reviewer.acme-reviewer.svc",
     "phase": "run",
-    "pointer": "/agent_tools/remote/url",
-    "port": 443,
-    "purpose": "agent remote (A2A)",
+    "pointer": "/agent_tools/reviewer/url",
+    "port": 8443,
+    "purpose": "agent reviewer (A2A)",
     "scheme": "https"
   }
 ]
