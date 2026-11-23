@@ -1,0 +1,12 @@
+[
+  {
+    "any_port": false,
+    "from_env": "OLLAMA_HOST",
+    "host": "localhost",
+    "phase": "run",
+    "pointer": "/model/provider",
+    "port": 11434,
+    "purpose": "model (ollama)",
+    "scheme": "http"
+  }
+]
