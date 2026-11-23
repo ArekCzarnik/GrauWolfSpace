@@ -10,7 +10,35 @@ use grauwolf_agents::events::Feature;
 /// Strategy graph of the agent.
 pub fn graph() -> Result<TypedGraph<AgentContext, String, String>, GraphError> {
     TypedGraph::build(|g| {
-        g.edge(&g.start(), &g.finish());
+        let node_classify_request = g
+            .node(
+                "classify_request",
+                grauwolf_agents::nodes::decide::<
+                    String,
+                >(
+                    "classify_request",
+                    "{\"kind\":\"choice\",\"options\":[{\"description\":\"Coding task: code, programming, software development, scripts, debugging, repositories\",\"name\":\"coding\"},{\"description\":\"General question: everything else\",\"name\":\"general\"}],\"question\":\"Was the following message from an assistant answering a user's request a coding task (writing, changing, debugging or explaining code, or software/technical implementation work) or a general question? Answer with exactly one option.\",\"value\":\"string\"}",
+                ),
+            );
+        g.edge(&g.start(), &node_classify_request);
+        g.edge_when(
+            &node_classify_request,
+            &g.finish(),
+            |ctx, value| grauwolf_agents::conditions::on_decision(
+                ctx,
+                &["coding"],
+                value,
+            ),
+        );
+        g.edge_when(
+            &node_classify_request,
+            &g.finish(),
+            |ctx, value| grauwolf_agents::conditions::on_decision(
+                ctx,
+                &["general"],
+                value,
+            ),
+        );
     })
 }
 /// Model from the spec.
@@ -61,7 +89,7 @@ pub async fn run_handled(
     Ok(RunHandles::run_graph(run, &mut ctx, graph, input, state).await?)
 }
 /// The spec of this crate as JSON (for `run_app`, ADR-0084).
-pub const SPEC_JSON: &str = "{\"spec_version\":1,\"name\":\"reviewer\",\"model\":{\"provider\":\"ollama\",\"id\":\"qwen3.5:9b\"},\"system_prompt\":\"\",\"types\":{},\"input\":\"string\",\"output\":\"string\",\"tools\":[],\"mcp_servers\":{},\"agent_tools\":{},\"builtin_tools\":null,\"knowledge\":null,\"long_term_memory\":null,\"tools_dir\":null,\"limits\":null,\"self_tools\":null,\"subgraphs\":{},\"strategy\":null,\"graph\":{\"nodes\":[],\"edges\":[{\"from\":\"start\",\"to\":\"finish\",\"when\":null}]}}";
+pub const SPEC_JSON: &str = "{\"spec_version\":1,\"name\":\"reviewer\",\"model\":{\"provider\":\"ollama\",\"id\":\"qwen3.5:9b\"},\"system_prompt\":\"\",\"types\":{},\"input\":\"string\",\"output\":\"string\",\"tools\":[],\"mcp_servers\":{},\"agent_tools\":{},\"builtin_tools\":null,\"knowledge\":null,\"long_term_memory\":null,\"tools_dir\":null,\"limits\":null,\"self_tools\":null,\"subgraphs\":{},\"strategy\":null,\"graph\":{\"nodes\":[{\"id\":\"classify_request\",\"kind\":\"decide\",\"params\":{\"kind\":\"choice\",\"options\":[{\"description\":\"Coding task: code, programming, software development, scripts, debugging, repositories\",\"name\":\"coding\"},{\"description\":\"General question: everything else\",\"name\":\"general\"}],\"question\":\"Was the following message from an assistant answering a user's request a coding task (writing, changing, debugging or explaining code, or software/technical implementation work) or a general question? Answer with exactly one option.\",\"value\":\"string\"}}],\"edges\":[{\"from\":\"start\",\"to\":\"classify_request\",\"when\":null},{\"from\":\"classify_request\",\"to\":\"finish\",\"when\":{\"kind\":\"on_decision\",\"params\":{\"answers\":[\"coding\"]}}},{\"from\":\"classify_request\",\"to\":\"finish\",\"when\":{\"kind\":\"on_decision\",\"params\":{\"answers\":[\"general\"]}}}]}}";
 /// Provisions the agent once: providers, external tools, sub-agents and long-term memory with paths relative to `base_dir`, configuration from `options` (feature `app`, ADR-0114).
 #[cfg(feature = "app")]
 pub async fn provision(
