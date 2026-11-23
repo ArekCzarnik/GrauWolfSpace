@@ -8,5 +8,15 @@
     "port": 11434,
     "purpose": "model (ollama)",
     "scheme": "http"
+  },
+  {
+    "any_port": false,
+    "from_env": null,
+    "host": "agent.example.com",
+    "phase": "run",
+    "pointer": "/agent_tools/remote/url",
+    "port": 443,
+    "purpose": "agent remote (A2A)",
+    "scheme": "https"
   }
 ]
