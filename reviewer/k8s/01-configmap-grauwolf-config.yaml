@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: grauwolf-k8-ops
+  name: grauwolf-config
+  namespace: acme-reviewer
+data:
+  grauwolf.toml: "[credentials.openbao]\naddress = \"http://openbao.openbao.svc:8200\"\nauth = { spiffe = { audience = \"openbao\", role = \"agent-acme-reviewer\", mount = \"jwt\" } }\nrefresh = \"5m\"\n\n[credentials.variables]\nGRAUWOLF_SERVER_TOKEN = \"openbao:kv/agents/acme-reviewer/server-token#value\"\n"
