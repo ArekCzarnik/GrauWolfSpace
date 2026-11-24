@@ -20,10 +20,14 @@ pub fn graph() -> Result<TypedGraph<AgentContext, String, String>, GraphError> {
                     "{\"kind\":\"choice\",\"options\":[{\"description\":\"Coding task: code, programming, software development, scripts, debugging, repositories\",\"name\":\"coding\"},{\"description\":\"General question: everything else\",\"name\":\"general\"}],\"question\":\"Was the following message from an assistant answering a user's request a coding task (writing, changing, debugging or explaining code, or software/technical implementation work) or a general question? Answer with exactly one option.\",\"value\":\"string\"}",
                 ),
             );
+        let node_review_coding = g
+            .node("review_coding", grauwolf_agents::nodes::llm_request);
+        let node_review_general = g
+            .node("review_general", grauwolf_agents::nodes::llm_request);
         g.edge(&g.start(), &node_classify_request);
         g.edge_when(
             &node_classify_request,
-            &g.finish(),
+            &node_review_coding,
             |ctx, value| grauwolf_agents::conditions::on_decision(
                 ctx,
                 &["coding"],
@@ -32,12 +36,22 @@ pub fn graph() -> Result<TypedGraph<AgentContext, String, String>, GraphError> {
         );
         g.edge_when(
             &node_classify_request,
-            &g.finish(),
+            &node_review_general,
             |ctx, value| grauwolf_agents::conditions::on_decision(
                 ctx,
                 &["general"],
                 value,
             ),
+        );
+        g.edge_when(
+            &node_review_coding,
+            &g.finish(),
+            grauwolf_agents::conditions::on_assistant_message,
+        );
+        g.edge_when(
+            &node_review_general,
+            &g.finish(),
+            grauwolf_agents::conditions::on_assistant_message,
         );
     })
 }
@@ -47,7 +61,11 @@ pub fn model() -> LlModel {
 }
 /// Initial prompt from the spec.
 pub fn prompt() -> Prompt {
-    Prompt::builder("reviewer").system("").build()
+    Prompt::builder("reviewer")
+        .system(
+            "You are a careful reviewer. You receive a text, code or answer to review. Check correctness, clarity, completeness and style. Answer in the language of the text with: a one-line verdict (Approved / Needs changes / Rejected), then at most five concrete findings as a bullet list, each with a suggested fix. Do not rewrite the whole text.",
+        )
+        .build()
 }
 /// Runs the agent with `input` in a fresh context.
 pub async fn run(
@@ -89,7 +107,7 @@ pub async fn run_handled(
     Ok(RunHandles::run_graph(run, &mut ctx, graph, input, state).await?)
 }
 /// The spec of this crate as JSON (for `run_app`, ADR-0084).
-pub const SPEC_JSON: &str = "{\"spec_version\":1,\"name\":\"reviewer\",\"model\":{\"provider\":\"ollama\",\"id\":\"qwen3.5:9b\"},\"system_prompt\":\"\",\"types\":{},\"input\":\"string\",\"output\":\"string\",\"tools\":[],\"mcp_servers\":{},\"agent_tools\":{},\"builtin_tools\":null,\"knowledge\":null,\"long_term_memory\":null,\"tools_dir\":null,\"limits\":null,\"self_tools\":null,\"subgraphs\":{},\"strategy\":null,\"graph\":{\"nodes\":[{\"id\":\"classify_request\",\"kind\":\"decide\",\"params\":{\"kind\":\"choice\",\"options\":[{\"description\":\"Coding task: code, programming, software development, scripts, debugging, repositories\",\"name\":\"coding\"},{\"description\":\"General question: everything else\",\"name\":\"general\"}],\"question\":\"Was the following message from an assistant answering a user's request a coding task (writing, changing, debugging or explaining code, or software/technical implementation work) or a general question? Answer with exactly one option.\",\"value\":\"string\"}}],\"edges\":[{\"from\":\"start\",\"to\":\"classify_request\",\"when\":null},{\"from\":\"classify_request\",\"to\":\"finish\",\"when\":{\"kind\":\"on_decision\",\"params\":{\"answers\":[\"coding\"]}}},{\"from\":\"classify_request\",\"to\":\"finish\",\"when\":{\"kind\":\"on_decision\",\"params\":{\"answers\":[\"general\"]}}}]}}";
+pub const SPEC_JSON: &str = "{\"spec_version\":1,\"name\":\"reviewer\",\"model\":{\"provider\":\"ollama\",\"id\":\"qwen3.5:9b\"},\"system_prompt\":\"You are a careful reviewer. You receive a text, code or answer to review. Check correctness, clarity, completeness and style. Answer in the language of the text with: a one-line verdict (Approved / Needs changes / Rejected), then at most five concrete findings as a bullet list, each with a suggested fix. Do not rewrite the whole text.\",\"types\":{},\"input\":\"string\",\"output\":\"string\",\"tools\":[],\"mcp_servers\":{},\"agent_tools\":{},\"builtin_tools\":null,\"knowledge\":null,\"long_term_memory\":null,\"tools_dir\":null,\"limits\":null,\"self_tools\":null,\"subgraphs\":{},\"strategy\":null,\"graph\":{\"nodes\":[{\"id\":\"classify_request\",\"kind\":\"decide\",\"params\":{\"kind\":\"choice\",\"options\":[{\"description\":\"Coding task: code, programming, software development, scripts, debugging, repositories\",\"name\":\"coding\"},{\"description\":\"General question: everything else\",\"name\":\"general\"}],\"question\":\"Was the following message from an assistant answering a user's request a coding task (writing, changing, debugging or explaining code, or software/technical implementation work) or a general question? Answer with exactly one option.\",\"value\":\"string\"}},{\"id\":\"review_coding\",\"kind\":\"llm_request\",\"params\":null},{\"id\":\"review_general\",\"kind\":\"llm_request\",\"params\":null}],\"edges\":[{\"from\":\"start\",\"to\":\"classify_request\",\"when\":null},{\"from\":\"classify_request\",\"to\":\"review_coding\",\"when\":{\"kind\":\"on_decision\",\"params\":{\"answers\":[\"coding\"]}}},{\"from\":\"classify_request\",\"to\":\"review_general\",\"when\":{\"kind\":\"on_decision\",\"params\":{\"answers\":[\"general\"]}}},{\"from\":\"review_coding\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}},{\"from\":\"review_general\",\"to\":\"finish\",\"when\":{\"kind\":\"on_assistant_message\",\"params\":null}}]}}";
 /// Provisions the agent once: providers, external tools, sub-agents and long-term memory with paths relative to `base_dir`, configuration from `options` (feature `app`, ADR-0114).
 #[cfg(feature = "app")]
 pub async fn provision(
